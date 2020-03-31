@@ -1,0 +1,8 @@
+High congestion: 
+('08CHS-34.5', 6115804.680000048) - Chancanab II
+Medium congestion: 
+('03STG-115', 441824.13000000024) - Santiaguito
+Low congestion: 
+('04PLD-230', -8400212.949999979) - Puerto Libertad
+
+
