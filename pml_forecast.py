@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import tensorflow as tf
 import os
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras import Sequential 
 from tensorflow.keras.layers import Dense, LSTM, Dropout
 
-
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 ###################################################################################################
 ### Function definitions
 ###
@@ -43,7 +44,7 @@ def genTrainTestData(df,date_param):
 	# Convert data into array
 	x_train, y_train = np.array(x_train), np.array(y_train)
 
-	return x_train, y_train, data_test, scaler
+	return x_train, y_train, data_test, scaler, data_training
 
 # Building LSTM NN
 def genNN(x_train):
@@ -52,20 +53,20 @@ def genNN(x_train):
 
 	#Change units to improve model, as well as dropout
 	#Layer 1
-	regressor.add(LSTM(units=50, activation='relu', return_sequences=True, input_shape=(x_train.shape[1],4)))
-	regressor.add(Dropout(0.2))
+	regressor.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1],4)))
+	regressor.add(Dropout(0.1))
 
 	#Layer 2
-	regressor.add(LSTM(units=60, activation='relu', return_sequences=True))
-	regressor.add(Dropout(0.2))
+	regressor.add(LSTM(units=120, return_sequences=True))
+	regressor.add(Dropout(0.1))
 
 	#Layer 3
-	regressor.add(LSTM(units=80, activation='relu', return_sequences=True))
-	regressor.add(Dropout(0.2))
+	regressor.add(LSTM(units=120, return_sequences=True))
+	regressor.add(Dropout(0.1))
 
 	#Layer 4
-	regressor.add(LSTM(units=120, activation ='relu'))
-	regressor.add(Dropout(0.2))
+	regressor.add(LSTM(units=240))
+	regressor.add(Dropout(0.1))
 
 	#Layer 5
 	regressor.add(Dense(units=1))
@@ -75,14 +76,14 @@ def genNN(x_train):
 # Train NN: NN object, y training data, optimizer algorithm, loss algorithm, number of epochs, batch size
 def trainNN(regressor, x_train, y_train, opt, l, ep, bat_s):
 	#Train the model, may increase the epochs
-	regressor.compile(optimizer='adam', loss='mean_squared_error', metric='accuracy')
-	regressor.fit(x_train, y_train, epochs=50, batch_size=32)
+	regressor.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
+	regressor.fit(x_train, y_train, epochs=ep, batch_size=bat_s)
 	return regressor
 
 # Form test data for predicting
-def testDataNN(DS, data_test):
+def testDataNN(DS, data_test,data_training,scaler):
 	#Prepare test data set
-	past_DATA_STEP_days = data_training.tail(DATA_STEP).shape
+	past_DATA_STEP_days = data_training.tail(DATA_STEP)
 	df = past_DATA_STEP_days.append(data_test, ignore_index=True)
 	df = df.drop(['Fecha','Clave del nodo','Hora'], axis=1)
 
@@ -103,7 +104,7 @@ def testDataNN(DS, data_test):
 	return x_test, y_test
 
 # Predict prices based on the LSTM Model with the prepared data
-def forecastLSTM(x_test, y_test, scaler):
+def forecastLSTM(regressor, x_test, y_test, scaler, data_training):
 	y_pred = regressor.predict(x_test)
 
 	#Inverse scaling in the prediction
@@ -131,7 +132,9 @@ def visualizeData(y_test, y_pred, node):
 
 ### Parameter definition
 frames = []
-DATA_STEP = 60
+DATA_STEP = 128
+EPOCHS = 10
+BATCH_SIZE = 64
 
 ### Read files and form global dataframe
 # Iterate through all files and add node data to global dataframe
@@ -145,34 +148,35 @@ global_data = pd.concat(frames, sort=False)
 
 
 ### Main program, call functions to perform LSTM prediction.
+
 # High congestion node
 hc_node = '08CHS-34.5'
 hc_df = dfNodeSplit(hc_node)
-hc_x_train, hc_y_train, hc_data_test, hc_scaler = genTrainTestData(hc_df,'2019-12-31')
+hc_x_train, hc_y_train, hc_data_test, hc_scaler, hc_data_training = genTrainTestData(hc_df,'2019-12-31')
 hc_regressor = genNN(hc_x_train)
-hc_regressor = trainNN(hc_regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',50,32)
-hc_x_test = testDataNN(DATA_STEP, hc_data_test)
-hc_y_pred, hc_y_test = forecastLSTM(hc_x_test, hc_y_test, hc_scaler)
+hc_regressor = trainNN(hc_regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+hc_x_test, hc_y_test = testDataNN(DATA_STEP, hc_data_test,hc_data_training, hc_scaler)
+hc_y_pred, hc_y_test = forecastLSTM(hc_regressor, hc_x_test, hc_y_test, hc_scaler, hc_data_training)
 visualizeData(hc_y_test,hc_y_pred, hc_node)
 
 # Medium congestion node
 mc_node = '03STG-115'
 mc_df = dfNodeSplit(mc_node)
-mc_x_train, mc_y_train, mc_data_test, mc_scaler = genTrainTestData(mc_df,'2019-12-31')
+mc_x_train, mc_y_train, mc_data_test, mc_scaler, mc_data_training = genTrainTestData(mc_df,'2019-12-31')
 mc_regressor = genNN(mc_x_train)
-mc_regressor = trainNN(mc_regressor, mc_x_train, mc_y_train, 'adam','mean_squared_error',50,32)
-mc_x_test = testDataNN(DATA_STEP, mc_data_test)
-mc_y_pred, mc_y_test = forecastLSTM(mc_x_test, mc_y_test, mc_scaler)
+mc_regressor = trainNN(mc_regressor, mc_x_train, mc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+mc_x_test, mc_y_test = testDataNN(DATA_STEP, mc_data_test,mc_data_training, mc_scaler)
+mc_y_pred, mc_y_test = forecastLSTM(mc_regressor,mc_x_test, mc_y_test, mc_scaler, mc_data_training)
 visualizeData(mc_y_test,mc_y_pred, mc_node)
 
 # Low Congestion node
 lc_node = '04PLD-230'
 lc_df = dfNodeSplit(lc_node)
-lc_x_train, lc_y_train, lc_data_test, lc_scaler = genTrainTestData(lc_df,'2019-12-31')
+lc_x_train, lc_y_train, lc_data_test, lc_scaler, lc_data_training = genTrainTestData(lc_df,'2019-12-31')
 lc_regressor = genNN(lc_x_train)
-lc_regressor = trainNN(lc_regressor, lc_x_train, lc_y_train, 'adam','mean_squared_error',50,32)
-lc_x_test = testDataNN(DATA_STEP, lc_data_test)
-lc_y_pred, lc_y_test = forecastLSTM(lc_x_test, lc_y_test, lc_scaler)
+lc_regressor = trainNN(lc_regressor, lc_x_train, lc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+lc_x_test, lc_y_test = testDataNN(DATA_STEP, lc_data_test, lc_data_training, lc_scaler)
+lc_y_pred, lc_y_test = forecastLSTM(lc_regressor,lc_x_test, lc_y_test, lc_scaler, lc_data_training)
 visualizeData(lc_y_test,lc_y_pred, lc_node)
 
 
