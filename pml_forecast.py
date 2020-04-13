@@ -125,6 +125,28 @@ def visualizeData(y_test, y_pred, node):
 	plt.legend()
 	plt.show()
 
+# Gets historical average for prices and returns a tuple with the hour in which electricity is cheaper (based on avg)
+# and its price.
+def historicalAverage(node):
+	# Create return dictionary
+	avgPML = {}
+	# Clean dataframe
+	clean_df = node.drop(['Fecha','Clave del nodo'], axis=1)
+
+	#Split df into hours
+	for i in range(1,25):
+		mask = clean_df['Hora'] == i
+		avgPML[i] = clean_df[mask]
+	
+	#Get average for each hour
+	for i in range(1,25):
+		avgPML[i] = avgPML[i].mean(0)
+	
+	key_min = min(avgPML.keys(), key=(lambda k: avgPML[k]['Precio marginal local ($/MWh)']))
+	return (key_min, avgPML[key_min]['Precio marginal local ($/MWh)'])
+	
+def simulation()
+
 ###################################################################################################
 ### Main Program
 ###
@@ -152,32 +174,33 @@ global_data = pd.concat(frames, sort=False)
 # High congestion node
 hc_node = '08CHS-34.5'
 hc_df = dfNodeSplit(hc_node)
-hc_x_train, hc_y_train, hc_data_test, hc_scaler, hc_data_training = genTrainTestData(hc_df,'2019-12-31')
-hc_regressor = genNN(hc_x_train)
-hc_regressor = trainNN(hc_regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
-hc_x_test, hc_y_test = testDataNN(DATA_STEP, hc_data_test,hc_data_training, hc_scaler)
-hc_y_pred, hc_y_test = forecastLSTM(hc_regressor, hc_x_test, hc_y_test, hc_scaler, hc_data_training)
-visualizeData(hc_y_test,hc_y_pred, hc_node)
+# hc_x_train, hc_y_train, hc_data_test, hc_scaler, hc_data_training = genTrainTestData(hc_df,'2019-12-31')
+# hc_regressor = genNN(hc_x_train)
+# hc_regressor = trainNN(hc_regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+# hc_x_test, hc_y_test = testDataNN(DATA_STEP, hc_data_test,hc_data_training, hc_scaler)
+# hc_y_pred, hc_y_test = forecastLSTM(hc_regressor, hc_x_test, hc_y_test, hc_scaler, hc_data_training)
+# visualizeData(hc_y_test,hc_y_pred, hc_node)
+hc_cheapest_hr = historicalAverage(hc_df)
 
 # Medium congestion node
 mc_node = '03STG-115'
 mc_df = dfNodeSplit(mc_node)
-mc_x_train, mc_y_train, mc_data_test, mc_scaler, mc_data_training = genTrainTestData(mc_df,'2019-12-31')
-mc_regressor = genNN(mc_x_train)
-mc_regressor = trainNN(mc_regressor, mc_x_train, mc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
-mc_x_test, mc_y_test = testDataNN(DATA_STEP, mc_data_test,mc_data_training, mc_scaler)
-mc_y_pred, mc_y_test = forecastLSTM(mc_regressor,mc_x_test, mc_y_test, mc_scaler, mc_data_training)
-visualizeData(mc_y_test,mc_y_pred, mc_node)
+# mc_x_train, mc_y_train, mc_data_test, mc_scaler, mc_data_training = genTrainTestData(mc_df,'2019-12-31')
+# mc_regressor = genNN(mc_x_train)
+# mc_regressor = trainNN(mc_regressor, mc_x_train, mc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+# mc_x_test, mc_y_test = testDataNN(DATA_STEP, mc_data_test,mc_data_training, mc_scaler)
+# mc_y_pred, mc_y_test = forecastLSTM(mc_regressor,mc_x_test, mc_y_test, mc_scaler, mc_data_training)
+# visualizeData(mc_y_test,mc_y_pred, mc_node)
 
 # Low Congestion node
 lc_node = '04PLD-230'
 lc_df = dfNodeSplit(lc_node)
-lc_x_train, lc_y_train, lc_data_test, lc_scaler, lc_data_training = genTrainTestData(lc_df,'2019-12-31')
-lc_regressor = genNN(lc_x_train)
-lc_regressor = trainNN(lc_regressor, lc_x_train, lc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
-lc_x_test, lc_y_test = testDataNN(DATA_STEP, lc_data_test, lc_data_training, lc_scaler)
-lc_y_pred, lc_y_test = forecastLSTM(lc_regressor,lc_x_test, lc_y_test, lc_scaler, lc_data_training)
-visualizeData(lc_y_test,lc_y_pred, lc_node)
+# lc_x_train, lc_y_train, lc_data_test, lc_scaler, lc_data_training = genTrainTestData(lc_df,'2019-12-31')
+# lc_regressor = genNN(lc_x_train)
+# lc_regressor = trainNN(lc_regressor, lc_x_train, lc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+# lc_x_test, lc_y_test = testDataNN(DATA_STEP, lc_data_test, lc_data_training, lc_scaler)
+# lc_y_pred, lc_y_test = forecastLSTM(lc_regressor,lc_x_test, lc_y_test, lc_scaler, lc_data_training)
+# visualizeData(lc_y_test,lc_y_pred, lc_node)
 
 
 
