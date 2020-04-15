@@ -6,7 +6,7 @@ import os
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras import Sequential 
 from tensorflow.keras.layers import Dense, LSTM, Dropout
-
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 ###################################################################################################
 ### Function definitions
@@ -17,16 +17,28 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 def dfNodeSplit(node):
 	# Split dataframes into each node
 	mask = global_data['Clave del nodo'] == node
-	return global_data[mask]
+	return_df = global_data[mask]
+	return_df.set_index(['Fecha','Hora'], inplace=True,drop=False)
+
+
+	return return_df
 
 # Returns prepared train and test. Dateparam indicates split between test and training data
 def genTrainTestData(df,date_param):
 	# Prepare data sets
 	data_training = df[df['Fecha'] < date_param].copy()
 	data_test = df[df['Fecha'] >= date_param].copy()
+	data_test = data_test.drop(['Fecha','Clave del nodo','Hora'], axis='columns')
 	
+	# dates = data_test.copy()
+	# dates = dates.drop(['Clave del nodo','Precio marginal local ($/MWh)','Componente de energia ($/MWh)', 'Componente de perdidas ($/MWh)', 'Componente de congestion ($/MWh)'], axis=1)
+	# index = dates
+
 	# Clean dataframe
 	training_data = data_training.drop(['Fecha','Clave del nodo','Hora'], axis=1)
+	#training_data = data_training.drop(['Clave del nodo', 'Componente de energia ($/MWh)', 'Componente de perdidas ($/MWh)', 'Componente de congestion ($/MWh)'], axis=1)
+	
+	print(training_data.head())
 
 	# Scale data 0-1
 	scaler = MinMaxScaler()
@@ -44,6 +56,7 @@ def genTrainTestData(df,date_param):
 	# Convert data into array
 	x_train, y_train = np.array(x_train), np.array(y_train)
 
+
 	return x_train, y_train, data_test, scaler, data_training
 
 # Building LSTM NN
@@ -53,42 +66,54 @@ def genNN(x_train):
 
 	#Change units to improve model, as well as dropout
 	#Layer 1
-	regressor.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1],4)))
-	regressor.add(Dropout(0.1))
+	regressor.add(LSTM(units=40, return_sequences=True, input_shape=(x_train.shape[1],4)))
+	
 
 	#Layer 2
 	regressor.add(LSTM(units=120, return_sequences=True))
-	regressor.add(Dropout(0.1))
+	#regressor.add(Dropout(0.005))
 
-	#Layer 3
-	regressor.add(LSTM(units=120, return_sequences=True))
-	regressor.add(Dropout(0.1))
+	# #Layer 3
+	# regressor.add(LSTM(units=120, return_sequences=True))
+	# regressor.add(Dropout(0.1))
 
 	#Layer 4
 	regressor.add(LSTM(units=240))
-	regressor.add(Dropout(0.1))
+	regressor.add(Dropout(0.3))
 
 	#Layer 5
 	regressor.add(Dense(units=1))
 
 	return regressor
 
+	return model
+
 # Train NN: NN object, y training data, optimizer algorithm, loss algorithm, number of epochs, batch size
 def trainNN(regressor, x_train, y_train, opt, l, ep, bat_s):
 	#Train the model, may increase the epochs
-	regressor.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
+	regressor.compile(optimizer='adam', loss='mean_squared_error')
 	regressor.fit(x_train, y_train, epochs=ep, batch_size=bat_s)
+
+
 	return regressor
 
 # Form test data for predicting
 def testDataNN(DS, data_test,data_training,scaler):
 	#Prepare test data set
 	past_DATA_STEP_days = data_training.tail(DATA_STEP)
-	df = past_DATA_STEP_days.append(data_test, ignore_index=True)
+	#df = past_DATA_STEP_days.append(data_test, ignore_index=True)
+
+	df = past_DATA_STEP_days.append(data_test,sort=False)
+
+	
 	df = df.drop(['Fecha','Clave del nodo','Hora'], axis=1)
+	#df = data_test.drop(['Clave del nodo','Componente de energia ($/MWh)', 'Componente de perdidas ($/MWh)', 'Componente de congestion ($/MWh)'], axis=1)
+
+	#df.set_index(['Fecha','Hora'], inplace=True)
 
 	#scale data
 	inputs = scaler.transform(df)
+	#inputs = scaler.transform(data_test)
 
 	#create test lists
 	x_test = []
@@ -106,7 +131,6 @@ def testDataNN(DS, data_test,data_training,scaler):
 # Predict prices based on the LSTM Model with the prepared data
 def forecastLSTM(regressor, x_test, y_test, scaler, data_training):
 	y_pred = regressor.predict(x_test)
-
 	#Inverse scaling in the prediction
 	scale = 1 / scaler.scale_[0]
 	y_pred = y_pred * scale
@@ -145,7 +169,30 @@ def historicalAverage(node):
 	key_min = min(avgPML.keys(), key=(lambda k: avgPML[k]['Precio marginal local ($/MWh)']))
 	return (key_min, avgPML[key_min]['Precio marginal local ($/MWh)'])
 	
-def simulation()
+
+
+# Buying routine: LSTM will look forward 24 hours to find minimum price of the day, historical avg
+# will buy the default hr.
+#for date in data.index.get_level_values('Fecha'):
+def simulation(data,avg_hr):
+	
+
+	print('Min Precio marginal local ($/MWh)')
+	print(len(data.loc[(slice(None),5), :]))
+	print(data.loc[(slice(None),5), :].sum()['Precio marginal local ($/MWh)'])
+	#print(data.groupby(level='Fecha').idxmin()['Precio marginal local ($/MWh)'])
+
+
+
+	print('SUM Min Prediccion LSTM PML')
+	lstm_min_index = data.groupby(level='Fecha').idxmin()['Prediccion PML'].tolist()
+	sum_lstm_PML = 0
+	for i in lstm_min_index:
+		print(data.loc[i]['Precio marginal local ($/MWh)'],data.loc[i]['Prediccion PML'])
+		sum_lstm_PML += data.loc[i]['Precio marginal local ($/MWh)']
+	print(sum_lstm_PML)
+	#print(data.iloc[data.index.get_level_values('Fecha') == '2020-01-01'])
+
 
 ###################################################################################################
 ### Main Program
@@ -154,9 +201,9 @@ def simulation()
 
 ### Parameter definition
 frames = []
-DATA_STEP = 128
+DATA_STEP = 164
 EPOCHS = 10
-BATCH_SIZE = 64
+BATCH_SIZE = 168
 
 ### Read files and form global dataframe
 # Iterate through all files and add node data to global dataframe
@@ -174,13 +221,21 @@ global_data = pd.concat(frames, sort=False)
 # High congestion node
 hc_node = '08CHS-34.5'
 hc_df = dfNodeSplit(hc_node)
-# hc_x_train, hc_y_train, hc_data_test, hc_scaler, hc_data_training = genTrainTestData(hc_df,'2019-12-31')
-# hc_regressor = genNN(hc_x_train)
-# hc_regressor = trainNN(hc_regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
-# hc_x_test, hc_y_test = testDataNN(DATA_STEP, hc_data_test,hc_data_training, hc_scaler)
-# hc_y_pred, hc_y_test = forecastLSTM(hc_regressor, hc_x_test, hc_y_test, hc_scaler, hc_data_training)
-# visualizeData(hc_y_test,hc_y_pred, hc_node)
-hc_cheapest_hr = historicalAverage(hc_df)
+hc_x_train, hc_y_train, hc_data_test, hc_scaler, hc_data_training = genTrainTestData(hc_df,'2019-12-31')
+hc_regressor = genNN(hc_x_train)
+hc_regressor = trainNN(hc_regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+hc_x_test, hc_y_test = testDataNN(DATA_STEP, hc_data_test,hc_data_training, hc_scaler)
+hc_y_pred, hc_y_test = forecastLSTM(hc_regressor, hc_x_test, hc_y_test, hc_scaler, hc_data_training)
+
+# Add prediction to test dataframe
+hc_data_test['Prediccion PML'] = hc_y_pred
+print(hc_data_test)
+
+hc_cheapest_hr = historicalAverage(hc_data_training)
+
+#Simulation: Historical average against LSTM
+simulation(hc_data_test,hc_cheapest_hr)
+visualizeData(hc_y_test,hc_y_pred, hc_node)
 
 # Medium congestion node
 mc_node = '03STG-115'
@@ -201,10 +256,3 @@ lc_df = dfNodeSplit(lc_node)
 # lc_x_test, lc_y_test = testDataNN(DATA_STEP, lc_data_test, lc_data_training, lc_scaler)
 # lc_y_pred, lc_y_test = forecastLSTM(lc_regressor,lc_x_test, lc_y_test, lc_scaler, lc_data_training)
 # visualizeData(lc_y_test,lc_y_pred, lc_node)
-
-
-
-
-
-
-
