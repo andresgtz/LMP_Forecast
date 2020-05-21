@@ -32,11 +32,34 @@ global_data = pd.concat(frames, sort=False)
 
 nodes = global_data['Clave del nodo'].unique()
 
+
+
+#print(len(global_data.loc[global_data['Clave del nodo']=='04ECC-400'].groupby('Fecha')))
+
 print("\nObtaining average intraday spreads for all nodes: ")
 pool = Pool(processes=5)
 #pool.map(historicSpread, nodes) 
-for _ in tqdm.tqdm(pool.imap_unordered(historicSpread, nodes[:10]), total=len(nodes[:10])):
+for _ in tqdm.tqdm(pool.imap_unordered(historicSpread, nodes), total=len(nodes)):
     pass
-#historicSpread(i)
 
-print(nodeAvgSpread)
+
+#Sort dictionary to obtain high, med and low congestion nodes
+print("Sorting dictionary")
+s_nodeAvgSpread = sorted(nodeAvgSpread.items(), key=lambda x: x[1], reverse=True)    
+
+print("Number of nodes: ", len(s_nodeAvgSpread))
+
+
+print("Top 5")
+for i in range(0, len(s_nodeAvgSpread)):
+	print(s_nodeAvgSpread[0 + i],len(global_data.loc[global_data['Clave del nodo'] == s_nodeAvgSpread[0 + i][0]].groupby('Fecha')))
+
+
+#print("Mid 5")
+#for i in range(0,20):
+# 	print(s_nodeAvgSpread[int(len(s_nodeAvgSpread)/2)+i],len(global_data.loc[global_data['Clave del nodo']==s_nodeAvgSpread[int(len(s_nodeAvgSpread)/2)+i][0]].groupby('Fecha')))
+
+
+# print("Bot 5")
+# for i in range(-100,0):
+# 	print(s_nodeAvgSpread[int(len(s_nodeAvgSpread))+i],len(global_data.loc[global_data['Clave del nodo']==s_nodeAvgSpread[int(len(s_nodeAvgSpread))+i][0]].groupby('Fecha')))

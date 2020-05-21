@@ -6,3 +6,10 @@ Low congestion:
 ('04PLD-230', -8400212.949999979) - Puerto Libertad
 
 
+ Para el segundo ejercicio, se dise;o y escribió un programa (anexo x) para seleccionar el nodo con la congestión más alta, el nodo con congestión media y el nodo con congestión más baja con la intención de cubrir nodos de diferente naturaleza en el análisis. Para esta selección se utilizó el promedio histórico del componente de congestión en la totalidad de datos. Como resultado de la selección, se obtuvieron los siguientes nodos:
+High congestion:
+('08CHS-34.5', 6115804.680000048) - Chancanab II (Cancun) 
+Medium congestion:
+('03STG-115', 441824.13000000024) - Santiaguito (Morelia)
+Low congestion:
+('04PLD-230', -8400212.949999979) - Puerto Libertad (Hermosillo)
