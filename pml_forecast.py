@@ -188,9 +188,10 @@ def historicalAverage(node):
 #for date in data.index.get_level_values('Fecha'):
 def simulation(data,avg_hr):
 	
+	print("\nSimulation:")
 
 	print('Min Precio marginal local ($/MWh)')
-	print(len(data.loc[(slice(None),5), :]))
+	#print(len(data.loc[(slice(None),5), :]))
 	print(data.loc[(slice(None),5), :].sum()['Precio marginal local ($/MWh)'])
 	#print(data.groupby(level='Fecha').idxmin()['Precio marginal local ($/MWh)'])
 
@@ -219,6 +220,7 @@ def mean_absolute_percentage_error(y_true, y_pred):
 
 #Print statistic metrics for each prediction.
 def statistics(real_Data,predictions):
+	print("\nStatistics:")
 	scaler = MinMaxScaler()
 	print(real_Data)
 	print(predictions)
@@ -238,7 +240,7 @@ def statistics(real_Data,predictions):
 ### Parameter definition
 frames = []
 DATA_STEP = 72
-EPOCHS = 10
+EPOCHS = 5
 BATCH_SIZE = 168
 
 ### Read files and form global dataframe
@@ -278,32 +280,36 @@ dummy_nodes.append('06LDC-115')
 
 print("\nTraining LSTM NN with dummy node data")
 
-for i in range(0, len(dummy_nodes)-7):
+for i in range(0, len(dummy_nodes)):
 	print("\nTraining for node: ", dummy_nodes[i])
 	dn_node = dummy_nodes[i]
 	dn_df = dfNodeSplit(dn_node)
 	dn_x_train, dn_y_train, dn_data_test, dn_scaler, dn_data_training = genTrainTestData(dn_df,'2019-12-31')
-	dn_regressor = genNN(dn_x_train)
-	dn_regressor = trainNN(dn_regressor, dn_x_train, dn_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, False)
+	if(i == 0):
+		regressor = genNN(dn_x_train)
+	regressor = trainNN(regressor, dn_x_train, dn_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, False)
 
-
+print("\nFinished with dummy node data... \n")
 
 #########################################################################################################
 ## EXPERIMENT DATA ANALYSIS
 ##
 ########################################################################################################
 
+print("\nBeginning experiment.")
+
 # High spread node
+print("\nHigh spread node: 08COZ-34.5")
 hc_node = '08COZ-34.5'
 hc_df = dfNodeSplit(hc_node)
 hc_x_train, hc_y_train, hc_data_test, hc_scaler, hc_data_training = genTrainTestData(hc_df,'2019-12-31')
 #print("debug")
 #print(len(hc_x_train))
 #print(hc_x_train)
-hc_regressor = genNN(hc_x_train)
-hc_regressor = trainNN(hc_regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, True)
+#regressor = genNN(hc_x_train)
+regressor = trainNN(regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, True)
 hc_x_test, hc_y_test = testDataNN(DATA_STEP, hc_data_test,hc_data_training, hc_scaler)
-hc_y_pred, hc_y_test = forecastLSTM(hc_regressor, hc_x_test, hc_y_test, hc_scaler, hc_data_training)
+hc_y_pred, hc_y_test = forecastLSTM(regressor, hc_x_test, hc_y_test, hc_scaler, hc_data_training)
 
 # Add prediction to test dataframe
 hc_data_test['Prediccion PML'] = hc_y_pred
@@ -317,13 +323,14 @@ visualizeData(hc_y_test,hc_y_pred, hc_node)
 statistics(hc_y_test,hc_y_pred)
 
 # Medium spread node
+print("\nMed spread node: 04EFU-115")
 mc_node = '04EFU-115'
 mc_df = dfNodeSplit(mc_node)
 mc_x_train, mc_y_train, mc_data_test, mc_scaler, mc_data_training = genTrainTestData(mc_df,'2019-12-31')
-mc_regressor = genNN(mc_x_train)
-mc_regressor = trainNN(mc_regressor, mc_x_train, mc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, True)
+#regressor = genNN(mc_x_train)
+regressor = trainNN(regressor, mc_x_train, mc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, True)
 mc_x_test, mc_y_test = testDataNN(DATA_STEP, mc_data_test,mc_data_training, mc_scaler)
-mc_y_pred, mc_y_test = forecastLSTM(mc_regressor,mc_x_test, mc_y_test, mc_scaler, mc_data_training)
+mc_y_pred, mc_y_test = forecastLSTM(regressor,mc_x_test, mc_y_test, mc_scaler, mc_data_training)
 
 # Add prediction to test dataframe
 mc_data_test['Prediccion PML'] = mc_y_pred
@@ -337,13 +344,14 @@ visualizeData(mc_y_test,mc_y_pred, mc_node)
 statistics(mc_y_test,mc_y_pred)
 
 # Low spread node
+print("\nLow spread node: 06PUO-115")
 lc_node = '06PUO-115'
 lc_df = dfNodeSplit(lc_node)
 lc_x_train, lc_y_train, lc_data_test, lc_scaler, lc_data_training = genTrainTestData(lc_df,'2019-12-31')
-lc_regressor = genNN(lc_x_train)
-lc_regressor = trainNN(lc_regressor, lc_x_train, lc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, True)
+#regressor = genNN(lc_x_train)
+regressor = trainNN(regressor, lc_x_train, lc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, True)
 lc_x_test, lc_y_test = testDataNN(DATA_STEP, lc_data_test, lc_data_training, lc_scaler)
-lc_y_pred, lc_y_test = forecastLSTM(lc_regressor,lc_x_test, lc_y_test, lc_scaler, lc_data_training)
+lc_y_pred, lc_y_test = forecastLSTM(regressor,lc_x_test, lc_y_test, lc_scaler, lc_data_training)
 
 
 # Add prediction to test dataframe
