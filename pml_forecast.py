@@ -42,7 +42,7 @@ def genTrainTestData(df,date_param):
 	training_data = data_training.drop(['Fecha','Clave del nodo','Hora'], axis=1)
 	#training_data = data_training.drop(['Clave del nodo', 'Componente de energia ($/MWh)', 'Componente de perdidas ($/MWh)', 'Componente de congestion ($/MWh)'], axis=1)
 	
-	print(training_data.head())
+	#print(training_data.head())
 
 	# Scale data 0-1
 	scaler = MinMaxScaler()
@@ -93,18 +93,19 @@ def genNN(x_train):
 	
 
 # Train NN: NN object, y training data, optimizer algorithm, loss algorithm, number of epochs, batch size
-def trainNN(regressor, x_train, y_train, opt, l, ep, bat_s):
+def trainNN(regressor, x_train, y_train, opt, l, ep, bat_s, graph_flag):
 	#Train the model, may increase the epochs
 	regressor.compile(optimizer='adam', loss='mean_squared_error')
 	history = regressor.fit(x_train, y_train, epochs=ep, batch_size=bat_s, validation_split=0.33)
 
-	plt.plot(history.history['loss'])
-	plt.plot(history.history['val_loss'])
-	plt.title('model train vs validation loss')
-	plt.ylabel('loss')
-	plt.xlabel('epoch')
-	plt.legend(['train', 'validation'], loc='upper right')
-	plt.show()
+	if graph_flag:
+		plt.plot(history.history['loss'])
+		plt.plot(history.history['val_loss'])
+		plt.title('model train vs validation loss')
+		plt.ylabel('loss')
+		plt.xlabel('epoch')
+		plt.legend(['train', 'validation'], loc='upper right')
+		plt.show()
 
 	return regressor
 
@@ -214,7 +215,7 @@ def mean_absolute_percentage_error(y_true, y_pred):
     #if _is_1d(y_true): 
     #    y_true, y_pred = _check_1d_array(y_true, y_pred)
 
-    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+    return np.mean(np.abs((y_true - y_pred) / y_true)) 
 
 #Print statistic metrics for each prediction.
 def statistics(real_Data,predictions):
@@ -231,7 +232,7 @@ def statistics(real_Data,predictions):
 
 ###################################################################################################
 ### Main Program
-###
+### Main program, call functions to perform LSTM prediction.
 ###################################################################################################
 
 ### Parameter definition
@@ -250,18 +251,57 @@ for filename in os.listdir('PML_DATA_selected_nodes/'):
 global_data = pd.concat(frames, sort=False)
 
 
+#########################################################################################################
+## Dummy nodes training
+##
+#########################################################################################################
 
-### Main program, call functions to perform LSTM prediction.
+#Dummy nodes for NN training
+#highspread
+dummy_nodes = []
+dummy_nodes.append('08CHB-34.5')
+dummy_nodes.append('08CHS-34.5')
+dummy_nodes.append('08PLY-115')
 
-# High congestion node
+#midspread
+dummy_nodes.append('01PIR-85')
+dummy_nodes.append('01INU-115')
+dummy_nodes.append('03GYS-115')
+
+#lowspread
+dummy_nodes.append('03ADR-69')
+dummy_nodes.append('06ETK-115')
+dummy_nodes.append('06LDC-115')
+
+
+#Train NN with the dummy node data.
+
+print("\nTraining LSTM NN with dummy node data")
+
+for i in range(0, len(dummy_nodes)-7):
+	print("\nTraining for node: ", dummy_nodes[i])
+	dn_node = dummy_nodes[i]
+	dn_df = dfNodeSplit(dn_node)
+	dn_x_train, dn_y_train, dn_data_test, dn_scaler, dn_data_training = genTrainTestData(dn_df,'2019-12-31')
+	dn_regressor = genNN(dn_x_train)
+	dn_regressor = trainNN(dn_regressor, dn_x_train, dn_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, False)
+
+
+
+#########################################################################################################
+## EXPERIMENT DATA ANALYSIS
+##
+########################################################################################################
+
+# High spread node
 hc_node = '08COZ-34.5'
 hc_df = dfNodeSplit(hc_node)
 hc_x_train, hc_y_train, hc_data_test, hc_scaler, hc_data_training = genTrainTestData(hc_df,'2019-12-31')
-print("debug")
-print(len(hc_x_train))
-print(hc_x_train)
+#print("debug")
+#print(len(hc_x_train))
+#print(hc_x_train)
 hc_regressor = genNN(hc_x_train)
-hc_regressor = trainNN(hc_regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+hc_regressor = trainNN(hc_regressor,hc_x_train, hc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, True)
 hc_x_test, hc_y_test = testDataNN(DATA_STEP, hc_data_test,hc_data_training, hc_scaler)
 hc_y_pred, hc_y_test = forecastLSTM(hc_regressor, hc_x_test, hc_y_test, hc_scaler, hc_data_training)
 
@@ -276,12 +316,12 @@ simulation(hc_data_test,hc_cheapest_hr)
 visualizeData(hc_y_test,hc_y_pred, hc_node)
 statistics(hc_y_test,hc_y_pred)
 
-# Medium congestion node
+# Medium spread node
 mc_node = '04EFU-115'
 mc_df = dfNodeSplit(mc_node)
 mc_x_train, mc_y_train, mc_data_test, mc_scaler, mc_data_training = genTrainTestData(mc_df,'2019-12-31')
 mc_regressor = genNN(mc_x_train)
-mc_regressor = trainNN(mc_regressor, mc_x_train, mc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+mc_regressor = trainNN(mc_regressor, mc_x_train, mc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, True)
 mc_x_test, mc_y_test = testDataNN(DATA_STEP, mc_data_test,mc_data_training, mc_scaler)
 mc_y_pred, mc_y_test = forecastLSTM(mc_regressor,mc_x_test, mc_y_test, mc_scaler, mc_data_training)
 
@@ -296,12 +336,12 @@ simulation(mc_data_test,mc_cheapest_hr)
 visualizeData(mc_y_test,mc_y_pred, mc_node)
 statistics(mc_y_test,mc_y_pred)
 
-# Low Congestion node
+# Low spread node
 lc_node = '06PUO-115'
 lc_df = dfNodeSplit(lc_node)
 lc_x_train, lc_y_train, lc_data_test, lc_scaler, lc_data_training = genTrainTestData(lc_df,'2019-12-31')
 lc_regressor = genNN(lc_x_train)
-lc_regressor = trainNN(lc_regressor, lc_x_train, lc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE)
+lc_regressor = trainNN(lc_regressor, lc_x_train, lc_y_train, 'adam','mean_squared_error',EPOCHS, BATCH_SIZE, True)
 lc_x_test, lc_y_test = testDataNN(DATA_STEP, lc_data_test, lc_data_training, lc_scaler)
 lc_y_pred, lc_y_test = forecastLSTM(lc_regressor,lc_x_test, lc_y_test, lc_scaler, lc_data_training)
 
